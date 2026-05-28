@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, Enum, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 import enum
 from database import Base
@@ -82,6 +82,11 @@ class Chapter(Base):
 
 class LearningRecord(Base):
     __tablename__ = "learning_records"
+    __table_args__ = (
+        UniqueConstraint("userId", "courseId", name="uq_user_course"),
+        Index("idx_lr_user", "userId"),
+        Index("idx_lr_course", "courseId"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     userId = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -97,6 +102,12 @@ class LearningRecord(Base):
 
 class BehaviorLog(Base):
     __tablename__ = "behavior_logs"
+    __table_args__ = (
+        Index("idx_bl_user", "userId"),
+        Index("idx_bl_course", "courseId"),
+        Index("idx_bl_action", "actionType"),
+        Index("idx_bl_created", "createdAt"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     userId = Column(Integer, ForeignKey("users.id"), nullable=False)

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from jose import jwt, JWTError
 from database import async_session
 from models import Course, Chapter, BehaviorLog
-from config import JWT_SECRET, JWT_ALGORITHM, OPENAI_API_KEY
+from config import JWT_SECRET, JWT_ALGORITHM, OPENAI_API_KEY, AI_CHECKER_INTERVAL
 from openai import AsyncOpenAI
 from datetime import datetime, timedelta, timezone
 
@@ -34,15 +34,24 @@ async def ai_tutor_chat(websocket: WebSocket):
     course_id = None
     course_title = "未知課程"
 
+    _context_cache: list | None = None
+    _context_cache_time: datetime | None = None
+
     async def _fetch_context():
-        """Query ALL behavior logs for this user (cross-course historical data)."""
+        """Query ALL behavior logs with 15-second cache to reduce DB load."""
+        nonlocal _context_cache, _context_cache_time
+        now = datetime.now(timezone.utc)
+        if _context_cache is not None and _context_cache_time is not None and (now - _context_cache_time).total_seconds() < 15:
+            return _context_cache
         async with async_session() as db:
             result = await db.execute(
                 select(BehaviorLog).where(
                     BehaviorLog.userId == user_id,
                 ).order_by(BehaviorLog.createdAt.desc()).limit(500)
             )
-            return list(result.scalars().all())
+            _context_cache = list(result.scalars().all())
+            _context_cache_time = now
+            return _context_cache
 
     async def _build_system_prompt(extra_context: str = "") -> str:
         db_logs = await _fetch_context()
@@ -161,7 +170,7 @@ async def ai_tutor_chat(websocket: WebSocket):
                             print(f"[AI_TUTOR] blockly_hint generated: {total} blocks, {block_names}")
                         except (ET.ParseError, Exception) as xml_err:
                             print(f"[AI_TUTOR] XML parse error for {bc.title}: {xml_err}")
-                            blockly_hint += f"\n【積木測驗正確解答】章節「{bc.title}」的正確答案：{bc.blocklyAnswer}"
+                            blockly_hint += f"\n【積木測驗資訊】章節「{bc.title}」包含積木測驗內容（解析失敗，略過）"
             except Exception as db_err:
                 print(f"[AI_TUTOR] blockly DB query error: {db_err}")
 
@@ -209,6 +218,8 @@ async def ai_tutor_chat(websocket: WebSocket):
                         reply += content
                         await websocket.send_json({"type": "chunk", "content": content})
                 conversation_history.append({"role": "assistant", "content": reply})
+                if len(conversation_history) > 30:
+                    conversation_history[:] = conversation_history[-30:]
                 await websocket.send_json({"type": "done"})
             except Exception as e:
                 await websocket.send_json({"type": "error", "content": str(e)})
@@ -273,10 +284,10 @@ async def ai_tutor_chat(websocket: WebSocket):
                 pass
 
     async def intervention_checker():
-        """Background loop: checks idle time & behavior logs every 5s."""
+        """Background loop: checks idle time & behavior logs."""
         while not stop_signal.is_set():
             try:
-                await asyncio.wait_for(stop_signal.wait(), timeout=5)
+                await asyncio.wait_for(stop_signal.wait(), timeout=AI_CHECKER_INTERVAL)
                 break
             except asyncio.TimeoutError:
                 pass
@@ -379,6 +390,8 @@ async def ai_tutor_chat(websocket: WebSocket):
                     await websocket.send_text("__pong__")
                     continue
                 session_events.append({"action": "ai_query", "detail": question[:100], "time": datetime.now(timezone.utc).isoformat()})
+                if len(session_events) > 50:
+                    session_events[:] = session_events[-50:]
                 await _chat(question)
 
             elif msg_type == "event":
@@ -389,6 +402,8 @@ async def ai_tutor_chat(websocket: WebSocket):
                     "detail": detail,
                     "time": datetime.now(timezone.utc).isoformat(),
                 })
+                if len(session_events) > 50:
+                    session_events[:] = session_events[-50:]
 
                 # Event-driven proactive triggers (no need to wait for 60s cycle)
                 now = datetime.now(timezone.utc)
@@ -420,6 +435,8 @@ async def ai_tutor_chat(websocket: WebSocket):
                     "detail": detail,
                     "time": datetime.now(timezone.utc).isoformat(),
                 })
+                if len(session_events) > 50:
+                    session_events[:] = session_events[-50:]
                 await _celebrate(action, detail)
 
     except WebSocketDisconnect:

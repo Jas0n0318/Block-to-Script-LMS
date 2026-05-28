@@ -10,3 +10,5 @@ JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+AI_CHECKER_INTERVAL = int(os.getenv("AI_CHECKER_INTERVAL", "5"))
