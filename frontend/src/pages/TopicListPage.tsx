@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../stores/authStore";
+import { copyToClipboard } from "../utils/clipboard";
 
 interface Course {
   id: number;
@@ -73,7 +74,7 @@ export default function TopicListPage() {
                 <code className="text-xs text-[#9AA6B2] font-mono">{student_token.slice(0, 8)}...</code>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(student_token);
+                    copyToClipboard(student_token);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}

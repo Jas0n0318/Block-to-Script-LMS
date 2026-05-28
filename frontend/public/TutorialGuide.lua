@@ -1,15 +1,34 @@
 --[[
-  TutorialGuide.lua (v3 — Fixed timeout + debounce)
+  TutorialGuide.lua (v4 — Configurable URL + Event)
   放入 ServerScriptService
-]]--
+
+  How it works:
+  - Reads API URL and Event from Workspace values if present
+  - Falls back to production defaults
+
+  REQUIREMENTS:
+  1. Workspace.Token (StringValue) — paste student_token here
+  2. Workspace.ApiUrl (StringValue, optional) — override webhook URL
+  3. Workspace.EventName (StringValue, optional) — override event name
+  4. Game Settings → Allow HTTP Requests checked
+]]
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
-local EVENT = "EVENT_ENV_TEST_COMPLETED"
-local WEBHOOK_URL = "http://127.0.0.1:8001/api/webhook/unlock"
+-- Default settings (used if no Workspace value is set)
+local DEFAULT_EVENT = "EVENT_ENV_TEST_COMPLETED"
+local DEFAULT_URL = "http://130.211.202.50:8001/api/webhook/unlock"
 
--- 設定 timeout（秒）
+local function getWS(name, default)
+	local v = workspace:FindFirstChild(name)
+	if v and v:IsA("StringValue") and v.Value ~= "" then return v.Value end
+	return default
+end
+
+local EVENT = getWS("EventName", DEFAULT_EVENT)
+local WEBHOOK_URL = getWS("ApiUrl", DEFAULT_URL)
+
 HttpService.Timeout = 5
 
 -- 防重複發送

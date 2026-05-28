@@ -10,6 +10,7 @@ import BlocklyWorkspace from "../components/BlocklyWorkspace";
 import LuaCodeBlock from "../components/LuaCodeBlock";
 import AiTutorPanel from "../components/AiTutorPanel";
 import { useAuthStore } from "../stores/authStore";
+import { copyToClipboard } from "../utils/clipboard";
 
 interface Chapter {
   id: number;
@@ -522,7 +523,7 @@ export default function CoursePage() {
                         </div>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(student_token || "");
+                            copyToClipboard(student_token || "");
                             setCopied(true);
                             setTimeout(() => setCopied(false), 2000);
                           }}

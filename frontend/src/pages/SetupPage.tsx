@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../stores/authStore";
+import { copyToClipboard } from "../utils/clipboard";
 
 interface Chapter {
   id: number;
@@ -315,7 +316,7 @@ export default function SetupPage() {
                         {student_token}
                       </code>
                       <button
-                        onClick={() => { navigator.clipboard.writeText(student_token || ""); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                        onClick={() => { copyToClipboard(student_token || ""); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
                         className="bg-white border border-[#BCCCDC] hover:bg-[#D9EAFD] hover:scale-105 active:scale-95 transition-all px-3.5 rounded-lg"
                       >
                         {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-[#9AA6B2]" />}
