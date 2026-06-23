@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, Enum, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, Date, ForeignKey, func, Enum, Index, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 import enum
 from database import Base
@@ -118,3 +118,58 @@ class BehaviorLog(Base):
     createdAt = Column(DateTime, default=func.now())
 
     user = relationship("User", back_populates="behaviorLogs")
+
+
+class StudyNote(Base):
+    __tablename__ = "study_notes"
+    __table_args__ = (
+        UniqueConstraint("userId", "chapterId", name="uq_student_note"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userId = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chapterId = Column(Integer, ForeignKey("chapters.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    createdAt = Column(DateTime, default=func.now())
+    updatedAt = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
+    chapter = relationship("Chapter")
+
+
+class ChapterFeedback(Base):
+    __tablename__ = "chapter_feedback"
+    __table_args__ = (
+        UniqueConstraint("userId", "chapterId", name="uq_student_feedback"),
+        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_rating_range"),
+        CheckConstraint("difficulty >= 1 AND difficulty <= 5", name="ck_difficulty_range"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userId = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chapterId = Column(Integer, ForeignKey("chapters.id"), nullable=False)
+    rating = Column(Integer, nullable=False)
+    difficulty = Column(Integer, nullable=False)
+    comment = Column(Text, nullable=True)
+    createdAt = Column(DateTime, default=func.now())
+
+    user = relationship("User")
+    chapter = relationship("Chapter")
+
+
+class LearningGoal(Base):
+    __tablename__ = "learning_goals"
+    __table_args__ = (
+        CheckConstraint("weeklyTarget > 0", name="ck_weekly_target_positive"),
+        CheckConstraint("endDate > startDate", name="ck_date_range"),
+        Index("idx_lg_user", "userId"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userId = Column(Integer, ForeignKey("users.id"), nullable=False)
+    weeklyTarget = Column(Integer, nullable=False)
+    startDate = Column(Date, nullable=False)
+    endDate = Column(Date, nullable=False)
+    createdAt = Column(DateTime, default=func.now())
+
+    user = relationship("User")

@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from database import init_db
 from config import CORS_ORIGINS
-from routers import auth, topics, courses, tracking, webhook, ai_tutor
+from routers import auth, topics, courses, tracking, webhook, ai_tutor, student_features
 from routers.admin import students, chapters as admin_courses
 
 
@@ -45,6 +45,7 @@ app.include_router(webhook.router)
 app.include_router(ai_tutor.router)
 app.include_router(students.router)
 app.include_router(admin_courses.router)
+app.include_router(student_features.router)
 
 
 # In production, serve the built frontend from ../frontend/dist

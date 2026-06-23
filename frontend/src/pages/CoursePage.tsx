@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import * as Blockly from "blockly";
 import {
   BookOpen, Puzzle, Code, Gamepad2, Lock, CheckCircle,
-  ChevronRight, ArrowLeft, Copy, Download, Sparkles, Trophy, Key
+  ChevronRight, ArrowLeft, Copy, Download, Sparkles, Trophy, Key,
+  FileText, Edit3, Trash2, Star, MessageSquare
 } from "lucide-react";
 import api from "../api/client";
 import BlocklyWorkspace from "../components/BlocklyWorkspace";
@@ -66,6 +67,17 @@ export default function CoursePage() {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const student_token = useAuthStore((s) => s.student_token);
 
+  // Notes state
+  const [note, setNote] = useState<{ id: number; content: string } | null>(null);
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteText, setNoteText] = useState("");
+
+  // Feedback state
+  const [feedback, setFeedback] = useState<{ rating: number; difficulty: number; comment: string | null } | null>(null);
+  const [fbRating, setFbRating] = useState(5);
+  const [fbDifficulty, setFbDifficulty] = useState(3);
+  const [fbComment, setFbComment] = useState("");
+
   // Page dwell tracking
   const dwellStartRef = useRef<number>(Date.now());
   const dwellChapterRef = useRef<{ id: number; type: string; title: string } | null>(null);
@@ -108,16 +120,40 @@ export default function CoursePage() {
     el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [activeIdx]);
 
-  // Track dwell on chapter change
+  // Fetch notes for current chapter
+  const fetchNotes = async (chapterId: number) => {
+    try {
+      const res = await api.get(`/api/notes?chapter_id=${chapterId}`);
+      setNote(res.data.length > 0 ? res.data[0] : null);
+      setNoteText(res.data.length > 0 ? res.data[0].content : "");
+    } catch { setNote(null); }
+  };
+
+  // Fetch feedback for current chapter
+  const fetchFeedback = async (chapterId: number) => {
+    try {
+      const res = await api.get(`/api/chapters/${chapterId}/feedback`);
+      setFeedback(res.data);
+      if (res.data) {
+        setFbRating(res.data.rating);
+        setFbDifficulty(res.data.difficulty);
+        setFbComment(res.data.comment || "");
+      }
+    } catch { setFeedback(null); }
+  };
+
+  // Track dwell + fetch notes/feedback on chapter change
   useEffect(() => {
     trackDwell();
-    if (course?.chapters[activeIdx]) {
+    const ch = course?.chapters[activeIdx];
+    if (ch) {
       dwellStartRef.current = Date.now();
-      dwellChapterRef.current = {
-        id: course.chapters[activeIdx].id,
-        type: course.chapters[activeIdx].type,
-        title: course.chapters[activeIdx].title,
-      };
+      dwellChapterRef.current = { id: ch.id, type: ch.type, title: ch.title };
+      fetchNotes(ch.id);
+      const lastIdx = (course?.chapters.length || 1) - 1;
+      if (activeIdx === lastIdx && ch.completed) {
+        fetchFeedback(ch.id);
+      }
     }
   }, [activeIdx]);
 
@@ -595,6 +631,136 @@ export default function CoursePage() {
                 </div>
               )}
             </div>
+
+            {/* ── 學習筆記 ── */}
+            <div className="bg-white border border-[#BCCCDC]/60 rounded-xl p-6 shadow-sm mt-8">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-5 h-5 text-blue-500" />
+                <h3 className="font-bold text-slate-700">學習筆記</h3>
+              </div>
+
+              {note && !editingNote ? (
+                <div className="bg-[#F8FAFC] border border-[#D9EAFD] rounded-lg p-4">
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{note.content}</p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => { setEditingNote(true); setNoteText(note.content); }}
+                      className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 font-medium"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />編輯
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await api.delete(`/api/notes/${note.id}`);
+                        setNote(null);
+                        setNoteText("");
+                      }}
+                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-500 font-medium"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />刪除
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="寫下你對這個章節的心得、重點或疑問…"
+                    className="w-full border border-[#BCCCDC] rounded-lg p-3 text-sm text-slate-600 resize-y min-h-[90px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={async () => {
+                        if (!noteText.trim()) return;
+                        if (note) {
+                          await api.put(`/api/notes/${note.id}`, { content: noteText });
+                        } else {
+                          await api.post("/api/notes", { chapterId: currentChapter.id, content: noteText });
+                        }
+                        setEditingNote(false);
+                        fetchNotes(currentChapter.id);
+                      }}
+                      className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all"
+                    >
+                      儲存筆記
+                    </button>
+                    {editingNote && (
+                      <button
+                        onClick={() => { setEditingNote(false); setNoteText(note?.content || ""); }}
+                        className="text-xs text-[#9AA6B2] hover:text-slate-700 px-3 py-2"
+                      >
+                        取消
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── 章節回饋 ── */}
+            {isLastChapter && currentChapter.completed && (
+              <div className="bg-white border border-[#BCCCDC]/60 rounded-xl p-6 shadow-sm mt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <MessageSquare className="w-5 h-5 text-amber-500" />
+                  <h3 className="font-bold text-slate-700">課程回饋</h3>
+                </div>
+
+                {feedback ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-center gap-4 mb-2">
+                      <span className="text-sm text-slate-600">評分：{'★'.repeat(feedback.rating)}{'☆'.repeat(5 - feedback.rating)}</span>
+                      <span className="text-sm text-slate-600">難度：{'●'.repeat(feedback.difficulty)}{'○'.repeat(5 - feedback.difficulty)}</span>
+                    </div>
+                    {feedback.comment && <p className="text-sm text-slate-500 mt-1">{feedback.comment}</p>}
+                    <p className="text-xs text-[#9AA6B2] mt-2">已收到你的回饋，感謝！</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 block mb-1.5">評分</label>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button key={n} onClick={() => setFbRating(n)} className={`p-1.5 rounded-lg transition-all ${n <= fbRating ? 'text-amber-400' : 'text-[#BCCCDC]'}`}>
+                            <Star className="w-6 h-6" fill={n <= fbRating ? '#FBBF24' : 'none'} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 block mb-1.5">難度</label>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button key={n} onClick={() => setFbDifficulty(n)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${n <= fbDifficulty ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-white text-[#9AA6B2] border-[#BCCCDC]'}`}>
+                            {['非常簡單', '簡單', '適中', '困難', '非常困難'][n - 1]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 block mb-1.5">想法或建議（選填）</label>
+                      <textarea
+                        value={fbComment}
+                        onChange={(e) => setFbComment(e.target.value)}
+                        placeholder="說說你對這門課的想法…"
+                        className="w-full border border-[#BCCCDC] rounded-lg p-3 text-sm text-slate-600 resize-y min-h-[70px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await api.post(`/api/chapters/${currentChapter.id}/feedback`, {
+                          rating: fbRating, difficulty: fbDifficulty, comment: fbComment || undefined,
+                        });
+                        fetchFeedback(currentChapter.id);
+                      }}
+                      className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold px-6 py-2.5 rounded-lg transition-all"
+                    >
+                      送出回饋
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 底部導覽 */}
             <div className="flex items-center justify-between mt-10 gap-4">

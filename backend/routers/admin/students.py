@@ -1,11 +1,12 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 from database import get_db
-from models import User, LearningRecord, BehaviorLog, Course, LearningStatus
+from models import User, LearningRecord, BehaviorLog, Course, Chapter, LearningStatus, StudyNote, ChapterFeedback, LearningGoal
 from middleware.auth import get_current_user
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -58,7 +59,7 @@ async def student_stats(
         select(User)
         .where(User.id == student_id)
         .options(
-            selectinload(User.learningRecords).selectinload(LearningRecord.course),
+            selectinload(User.learningRecords).selectinload(LearningRecord.course).selectinload(Course.chapters),
             selectinload(User.behaviorLogs),
         )
     )
@@ -66,15 +67,84 @@ async def student_stats(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
+    # Parse completed chapters from each learning record
+    progress = []
+    totalChaptersCompleted = 0
+    totalChapters = 0
+    for r in sorted(student.learningRecords, key=lambda x: x.course.orderIndex):
+        chData = {}
+        if r.chapters:
+            try:
+                chData = json.loads(r.chapters)
+            except:
+                pass
+        chTotal = len(r.course.chapters)
+        chCompleted = sum(1 for ch in r.course.chapters if str(ch.id) in chData and chData[str(ch.id)])
+        totalChaptersCompleted += chCompleted
+        totalChapters += chTotal
+        progress.append({
+            "course": r.course.title,
+            "status": r.status,
+            "chaptersCompleted": chCompleted,
+            "chaptersTotal": chTotal,
+        })
+
+    # Fetch notes
+    notes_result = await db.execute(
+        select(StudyNote).where(StudyNote.userId == student_id)
+    )
+    notes = notes_result.scalars().all()
+    notes_data = [
+        {
+            "id": n.id,
+            "chapterId": n.chapterId,
+            "content": n.content[:200],
+            "createdAt": n.createdAt.isoformat() if n.createdAt else None,
+        }
+        for n in notes
+    ]
+
+    # Fetch feedback
+    fb_result = await db.execute(
+        select(ChapterFeedback).where(ChapterFeedback.userId == student_id)
+    )
+    feedbacks = fb_result.scalars().all()
+    feedback_data = [
+        {
+            "id": f.id,
+            "chapterId": f.chapterId,
+            "rating": f.rating,
+            "difficulty": f.difficulty,
+            "comment": f.comment,
+            "createdAt": f.createdAt.isoformat() if f.createdAt else None,
+        }
+        for f in feedbacks
+    ]
+
+    # Fetch goals
+    goal_result = await db.execute(
+        select(LearningGoal).where(LearningGoal.userId == student_id)
+    )
+    goals = goal_result.scalars().all()
+    goals_data = [
+        {
+            "id": g.id,
+            "weeklyTarget": g.weeklyTarget,
+            "startDate": g.startDate.isoformat() if g.startDate else None,
+            "endDate": g.endDate.isoformat() if g.endDate else None,
+            "createdAt": g.createdAt.isoformat() if g.createdAt else None,
+        }
+        for g in goals
+    ]
+
     return {
         "username": student.username,
-        "progress": [
-            {
-                "course": r.course.title,
-                "status": r.status,
-            }
-            for r in sorted(student.learningRecords, key=lambda x: x.course.orderIndex)
-        ],
+        "progress": progress,
+        "totalChaptersCompleted": totalChaptersCompleted,
+        "totalChapters": totalChapters,
+        "notes": notes_data,
+        "feedback": feedback_data,
+        "goals": goals_data,
         "recentActivity": [
             {
                 "action": b.actionType,

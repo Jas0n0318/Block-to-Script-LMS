@@ -5,6 +5,7 @@ import RegisterPage from "./pages/RegisterPage";
 import TopicListPage from "./pages/TopicListPage";
 import CoursePage from "./pages/CoursePage";
 import SetupPage from "./pages/SetupPage";
+import DashboardPage from "./pages/DashboardPage";
 import StudentListPage from "./pages/admin/StudentListPage";
 import AnalyticsPage from "./pages/admin/AnalyticsPage";
 
@@ -27,6 +28,10 @@ function App() {
         <Route
           path="/courses/:courseId"
           element={<ProtectedRoute><CoursePage /></ProtectedRoute>}
+        />
+        <Route
+          path="/dashboard"
+          element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}
         />
         <Route
           path="/setup"

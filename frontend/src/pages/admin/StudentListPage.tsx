@@ -72,7 +72,7 @@ export default function StudentListPage() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
             <GraduationCap className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-sm text-slate-700">教師儀表板</span>
+          <span className="font-bold text-sm text-slate-700">學生管理</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-[#9AA6B2] hidden sm:block">{user?.username}</span>

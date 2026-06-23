@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   BookOpen, Lock, Unlock, CheckCircle,
   Code, Gamepad2, LogOut, Copy, Check, GraduationCap,
-  LayoutDashboard, ArrowRight, Sparkles
+  LayoutDashboard, ArrowRight, Sparkles, BarChart3
 } from "lucide-react";
 import api from "../api/client";
 import { useAuthStore } from "../stores/authStore";
@@ -84,6 +84,13 @@ export default function TopicListPage() {
                 </button>
               </div>
             )}
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 transition-colors px-2 py-1.5 rounded-lg hover:bg-emerald-50"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">學習進度</span>
+            </button>
             <span className="text-sm text-[#9AA6B2] hidden sm:block">{user?.username}</span>
             <button
               onClick={logout}

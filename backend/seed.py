@@ -3,7 +3,8 @@ import json
 import bcrypt as bcr
 from sqlalchemy import select
 from database import async_session, init_db
-from models import User, Topic, Course, Chapter, LearningRecord, UserRole, ChapterType, LearningStatus
+from models import User, Topic, Course, Chapter, LearningRecord, StudyNote, ChapterFeedback, LearningGoal, UserRole, ChapterType, LearningStatus
+from datetime import date, timedelta
 
 
 async def seed():
@@ -347,6 +348,41 @@ game:GetService('RunService').Heartbeat:Connect(______)""",
                     userId=student.id, courseId=c.id,
                     status=LearningStatus.UNLOCKED if i == 0 else LearningStatus.LOCKED
                 ))
+
+        # ── 學習筆記範例 ──
+        ch_c1_c1 = await db.execute(
+            select(Chapter).where(Chapter.courseId == c1_1.id, Chapter.orderIndex == 1)
+        )
+        ch1 = ch_c1_c1.scalar_one_or_none()
+        if ch1:
+            db.add(StudyNote(userId=student1.id, chapterId=ch1.id,
+                             content="移動工具按 W，縮放按 E，旋轉按 R，這三個快捷鍵要記熟。"))
+
+        ch_c2_c2 = await db.execute(
+            select(Chapter).where(Chapter.courseId == c2_3.id, Chapter.orderIndex == 2)
+        )
+        ch2 = ch_c2_c2.scalar_one_or_none()
+        if ch2:
+            db.add(StudyNote(userId=student1.id, chapterId=ch2.id,
+                             content="heartbeat 觸發要接 rotate 積木，Y 軸設 0.01 才會慢慢轉。"))
+
+        # ── 章節回饋範例（c1_2 的最後一章）──
+        ch_last = await db.execute(
+            select(Chapter).where(Chapter.courseId == c1_2.id).order_by(Chapter.orderIndex.desc()).limit(1)
+        )
+        last_ch = ch_last.scalar_one_or_none()
+        if last_ch:
+            db.add(ChapterFeedback(
+                userId=student1.id, chapterId=last_ch.id,
+                rating=4, difficulty=2, comment="快捷鍵整理得很清楚，對新手友善。"
+            ))
+
+        # ── 學習目標範例 ──
+        db.add(LearningGoal(
+            userId=student1.id, weeklyTarget=5,
+            startDate=date.today(),
+            endDate=date.today() + timedelta(days=7),
+        ))
 
         await db.commit()
         print("[OK] Seed done")

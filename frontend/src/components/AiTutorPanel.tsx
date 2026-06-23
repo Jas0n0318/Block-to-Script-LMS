@@ -132,8 +132,9 @@ export default function AiTutorPanel({ courseId }: Props) {
     }
     prevCourseId.current = courseId;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
+    const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const protocol = apiUrl.startsWith("https") ? "wss:" : "ws:";
+    const host = apiUrl.replace(/^https?:\/\//, "");
     const ws = new WebSocket(`${protocol}//${host}/api/ai-tutor/chat`);
 
     ws.onopen = () => {
